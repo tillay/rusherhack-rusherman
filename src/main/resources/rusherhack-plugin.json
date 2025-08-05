@@ -1,0 +1,15 @@
+{
+  "Plugin-Class": "org.tilley.RusherMan",
+  "Name": "${project.plugin_name}",
+  "Version": "${project.plugin_version}",
+  "Description": "Simple package manager for rusherhack plugins",
+  "Authors": [
+    "Tilley8"
+  ],
+  "Minecraft-Versions": [
+    "1.21.4",
+    "1.21.3",
+    "1.21.2",
+    "1.21.1"
+  ]
+}
