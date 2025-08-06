@@ -5,8 +5,6 @@ import org.rusherhack.core.command.annotations.CommandExecutor;
 
 import java.io.File;
 
-import static org.tilley.PluginUtils.PluginMetadata.parsePluginJarMetadata;
-
 public class RusherManCommand extends Command {
 
 
@@ -15,25 +13,76 @@ public class RusherManCommand extends Command {
     }
 
     private String getPluginDir() {
-        return mc.gameDirectory.toPath()+"/rusherhack/plugins";
+        return mc.gameDirectory.toPath() + "/rusherhack/plugins";
     }
 
-    private File[] getJarFiles() {
+    private File[] getFiles() {
         File dir = new File(getPluginDir());
-        return dir.listFiles(f -> f.isFile() && f.getName().endsWith(".jar"));
+        return dir.listFiles(File::isFile);
     }
 
-    @CommandExecutor(subCommand = "listInstalled")
-    private String listInstalled() {
+    private boolean isFailed(String pluginName) {
+        return false; // TODO MAKE THIS WORK WHEN JOHN FIXES HIS SRC
+    }
+
+    @CommandExecutor(subCommand = "list all")
+    private String listAll() {
         StringBuilder fileString = new StringBuilder();
-        try {
-            for (int i = 0; i < getJarFiles().length; i++) {
-                fileString.append(parsePluginJarMetadata(getJarFiles()[i]));
+        for (File file : getFiles()) {
+            if (file.getName().endsWith(".jar") || file.getName().endsWith(".jar.disabled")) {
+                fileString.append(file.getName()).append("\n");
             }
-            return fileString.toString();
-        } catch (Exception ignored) {
-            return "wtf";
         }
+        return fileString.toString();
     }
 
+    @CommandExecutor(subCommand = "list enabled")
+    private String listEnabled() {
+        StringBuilder fileString = new StringBuilder();
+        for (File file : getFiles()) {
+            if (file.getName().endsWith(".jar") && !isFailed(file.getName())) {
+                fileString.append(file.getName()).append("\n");
+            }
+        }
+        return fileString.toString();
+    }
+
+    @CommandExecutor(subCommand = "list disabled")
+    private String listDisabled() {
+        StringBuilder fileString = new StringBuilder();
+        for (File file : getFiles()) {
+            if (file.getName().endsWith(".jar.disabled")) {
+                fileString.append(file.getName()).append("\n");
+            }
+        }
+        return fileString.toString();
+    }
+
+    @CommandExecutor(subCommand = "list failed")
+    private String listFailed() {
+        StringBuilder fileString = new StringBuilder();
+        for (File file : getFiles()) {
+            if (isFailed(file.getName())) {
+                fileString.append(file.getName()).append("\n");
+            }
+        }
+        return fileString.toString();
+    }
+
+    @CommandExecutor(subCommand = "enable")
+    @CommandExecutor.Argument("plugin file name")
+    private String enablePlugin(String pluginName) {
+        File pluginFile = new File(getPluginDir(), pluginName);
+        if (pluginFile.isFile()) {
+            if (pluginFile.getName().endsWith(".jar.disabled")) {
+                pluginFile.renameTo(new File(pluginFile.getParent(), pluginFile.getName().replaceFirst("\\.disabled$", "")));
+                return "Successfully enabled plugin " + pluginName;
+            } else if (pluginFile.getName().endsWith(".jar")) {
+                return "Plugin " + pluginName + " is already enabled";
+            } else {
+                return "File " + pluginName + " is not a plugin!";
+            }
+        }
+        return "File not found: " + pluginName;
+    }
 }
