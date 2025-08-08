@@ -5,7 +5,6 @@ import net.minecraft.network.chat.MutableComponent;
 import org.rusherhack.client.api.feature.command.Command;
 import org.rusherhack.core.command.annotations.CommandExecutor;
 import org.rusherhack.core.command.argument.StringCapture;
-import org.rusherhack.client.api.utils.ChatUtils;
 
 import java.io.*;
 import java.net.URL;
@@ -41,36 +40,17 @@ public class RusherManCommand extends Command {
     }
 
     @CommandExecutor(subCommand = "list")
-    private String listAll() throws Exception {
-        StringBuilder fileString = new StringBuilder();
-        for (File file : getFiles()) {
-            if (file.getName().endsWith(".jar") || file.getName().endsWith(".jar.disabled")) {
-                fileString.append("\n").append(parsePluginJarMetadata(file).getName());
-            }
-        }
-        return "All Plugins: " + fileString;
-    }
-
-    @CommandExecutor(subCommand = "list enabled")
-    private String listEnabled() throws Exception {
-        StringBuilder fileString = new StringBuilder();
+    private Component listAll() throws Exception {
+        MutableComponent outputComponent = (MutableComponent) makeComponent("Installed plugins:\n", 0xffffff);
         for (File file : getFiles()) {
             if (file.getName().endsWith(".jar")) {
-                fileString.append("\n").append(parsePluginJarMetadata(file).getName());
+                outputComponent.append(makeComponent(parsePluginJarMetadata(file).getName() + "\n", 0x00ff00));
+            }
+            else if (file.getName().endsWith(".jar.disabled")) {
+                outputComponent.append(makeComponent(parsePluginJarMetadata(file).getName() + "\n", 0xff0000));
             }
         }
-        return "Plugins that are enabled: " + fileString;
-    }
-
-    @CommandExecutor(subCommand = "list disabled")
-    private String listDisabled() throws Exception {
-        StringBuilder fileString = new StringBuilder();
-        for (File file : getFiles()) {
-            if (file.getName().endsWith(".jar.disabled")) {
-                fileString.append("\n").append(parsePluginJarMetadata(file).getName());
-            }
-        }
-        return "Plugins that were disabled manually: " + fileString;
+        return outputComponent;
     }
 
     @CommandExecutor(subCommand = "jar")
@@ -100,20 +80,17 @@ public class RusherManCommand extends Command {
         return "No installed plugin found with name " + pluginName.string();
     }
 
-    @CommandExecutor(subCommand = "enable")
+    @CommandExecutor(subCommand = "remove")
     @CommandExecutor.Argument("plugin name (case sensitive)")
-    private String enablePlugin(StringCapture pluginName) throws Exception {
+    private Component removePlugin(StringCapture pluginName) throws Exception {
         File pluginFile = new File(getPluginDir(), fileFromName(pluginName));
         if (pluginFile.isFile()) {
-            if (pluginFile.getName().endsWith(".jar.disabled")) {
-                pluginFile.renameTo(new File(pluginFile.getParent(), pluginFile.getName().replaceFirst("\\.disabled$", "")));
-                return "Successfully enabled plugin " + pluginName.string();
-            } else if (pluginFile.getName().endsWith(".jar")) {
-                return "Plugin " + pluginName.string() + " is already enabled";
-            }
+            if (pluginFile.delete()) return makeComponent("Removed: " + pluginName.string(), 0xff0000);
+            return makeComponent("Failed to remove: " + pluginName.string(), 0xff0000);
         }
-        return "File not found: " + pluginName.string();
+        return makeComponent("Plugin not found: " + pluginName.string(), 0xff0000);
     }
+
 
     @CommandExecutor(subCommand = "disable")
     @CommandExecutor.Argument("plugin name (case sensitive)")
@@ -133,6 +110,20 @@ public class RusherManCommand extends Command {
         return "File not found: " + pluginName.string();
     }
 
+    @CommandExecutor(subCommand = "enable")
+    @CommandExecutor.Argument("plugin name (case sensitive)")
+    private Component enablePlugin(StringCapture pluginName) throws Exception {
+        File pluginFile = new File(getPluginDir(), fileFromName(pluginName));
+        if (pluginFile.isFile()) {
+            if (pluginFile.getName().endsWith(".jar.disabled")) {
+                pluginFile.renameTo(new File(pluginFile.getParent(), pluginFile.getName().replaceFirst("\\.disabled$", "")));
+                return makeComponent("Successfully enabled plugin " + pluginName.string(), 0xffffff);
+            } else if (pluginFile.getName().endsWith(".jar")) {
+                return makeComponent("Plugin " + pluginName.string() + " is already enabled", 0xffffff);
+            }
+        }
+        return makeComponent("File not found: " + pluginName.string(), 0xffffff);
+    }
 
     // BELOW IS FUNCTIONS THAT WORK WITH THE REMOTE LIST PROVIDED BY GARLIC
     private JsonArray getRemotePluginsJson() {
@@ -211,8 +202,6 @@ public class RusherManCommand extends Command {
         return "Plugin not found";
     }
 
-    @CommandExecutor(subCommand = "downloads")
-    @CommandExecutor.Argument("plugin name")
     private Component listDownloads(StringCapture pluginName) throws Exception {
         List<String> urls = getReleaseLink(pluginName.string());
         if (urls == null) return makeComponent("No plugin with that name found", 0xff0000);
@@ -220,7 +209,6 @@ public class RusherManCommand extends Command {
         for (String url : urls) urlList.append(linkify(url+"\n", url, 0x00FFFF));
         return urlList;
     }
-
 
     private List<String> getReleaseLink(String pluginName) throws Exception {
         for (JsonElement plugin : getRemotePluginsJson()) {
@@ -242,28 +230,30 @@ public class RusherManCommand extends Command {
     @CommandExecutor(subCommand = "install")
     @CommandExecutor.Argument("plugin name or download link")
     private Component installPlugin(StringCapture userInput) throws Exception {
+        MutableComponent outputComponent = (MutableComponent) makeComponent("", 0xffffff);
+
         if (userInput.string().startsWith("https://")&&userInput.string().endsWith(".jar")) {
-            ChatUtils.print("Detected link for manual download...");
+            outputComponent.append(makeComponent("Detected link for manual download...\n", 0xffffff));
             downloadLinks.add(userInput.string());
-            disclaimer();
-            return makeComponent("use *confirm to continue download", 0xffff00);
+            outputComponent.append(disclaimer());
+            return outputComponent.append(makeComponent("use *confirm to continue download", 0xffff00));
         } else {
                 List<String>possibleLinks =  getReleaseLink(userInput.string());
                 if (possibleLinks != null) {
                     if (possibleLinks.size() == 1) {
-                        ChatUtils.print(((MutableComponent) makeComponent("Found download candidate! Downloading from ", 0x00ff00)).append(linkify(possibleLinks.getFirst(), possibleLinks.getFirst(), 0x00FFFF)));
+                        outputComponent.append(makeComponent("Found download candidate! Downloading from ", 0x00ff00)).append(linkify(possibleLinks.getFirst()+"\n", possibleLinks.getFirst(), 0x00FFFF));
                         downloadLinks.add(possibleLinks.getFirst());
-                        disclaimer();
-                        return makeComponent("use *confirm to continue download", 0xffff00);
+                        outputComponent.append(disclaimer());
+                        return outputComponent.append(makeComponent("use *confirm to continue download", 0xffff00));
                     } else {
-                        ChatUtils.print("Detected Multiple links");
+                        outputComponent.append(makeComponent("Detected Multiple links\n", 0xffffff));
                         int i = 1;
                         for (String link : possibleLinks) {
                             downloadLinks.add(link);
-                            ChatUtils.print(((MutableComponent) makeComponent(i++ + ". ", 0xffffff)).append(linkify(link, link, 0x00FFFF)));
+                            outputComponent.append(makeComponent(i++ + ". ", 0xffffff)).append(linkify(link+"\n", link, 0x00FFFF));
                         }
-                        disclaimer();
-                        return makeComponent("use *confirm <number> to download the plugin from said link", 0xffff00);
+                        outputComponent.append(disclaimer());
+                        return outputComponent.append(makeComponent("use *confirm <number> to download the plugin from said link", 0xffff00));
                     }
                 }
                 return makeComponent("Plugin not found! Please input a file link or plugin name!\nYou can find plugin names by using *rusherman list remote compatible", 0xFF0000);

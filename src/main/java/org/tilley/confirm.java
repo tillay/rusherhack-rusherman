@@ -1,7 +1,8 @@
 package org.tilley;
 
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import org.rusherhack.client.api.feature.command.Command;
-import org.rusherhack.client.api.utils.ChatUtils;
 import org.rusherhack.core.command.annotations.CommandExecutor;
 import static org.tilley.ComponentUtils.*;
 
@@ -21,29 +22,31 @@ public class confirm extends Command {
 
     @CommandExecutor()
     @CommandExecutor.Argument("option")
-    private void confirm(Optional<Integer> option) {
+    private Component confirm(Optional<Integer> option) {
+        MutableComponent outputComponent = (MutableComponent) makeComponent("", 0xffffff);
         if (!RusherManCommand.downloadLinks.isEmpty()) {
             if (RusherManCommand.downloadLinks.size() == 1) {
-                ChatUtils.print("Downloading plugin...");
-                downloadPlugin(RusherManCommand.downloadLinks.getFirst());
+                outputComponent.append(makeComponent("Downloading plugin...\n", 0xffffff));
+                outputComponent.append(downloadPlugin(RusherManCommand.downloadLinks.getFirst()));
                 RusherManCommand.downloadLinks.clear();
             } else if (option.isPresent()) {
                 if (option.get() <= RusherManCommand.downloadLinks.size()) {
-                    ChatUtils.print("Downloading plugin candidate " + option.get() + "...");
-                    downloadPlugin(RusherManCommand.downloadLinks.get(option.get() - 1));
+                    outputComponent.append(makeComponent("Downloading plugin candidate " + option.get() + "...\n", 0xffffff));
+                    outputComponent.append(downloadPlugin(RusherManCommand.downloadLinks.get(option.get() - 1)));
                     RusherManCommand.downloadLinks.clear();
                 } else {
-                    ChatUtils.print("Invalid option!");
+                    outputComponent.append(makeComponent("Invalid option!", 0x00ffff));
                 }
             } else {
-                ChatUtils.print("Please select an option to download.");
+                outputComponent.append(makeComponent("Please select an option to download.", 0x00ffff));
             }
         } else {
-            ChatUtils.print("Please use *rusherman install <plugin name> to get an action to confirm.");
+            outputComponent.append(makeComponent("Please use *rusherman install <plugin name> to get an action to confirm.", 0xff0000));
         }
+        return outputComponent;
     }
 
-    private void downloadPlugin(String url) {
+    private Component downloadPlugin(String url) {
         try {
             Path dir = mc.gameDirectory.toPath().resolve("rusherhack/plugins");
             Files.createDirectories(dir);
@@ -52,9 +55,9 @@ public class confirm extends Command {
             try (InputStream in = new URL(url).openStream()) {
                 Files.copy(in, filePath, StandardCopyOption.REPLACE_EXISTING);
             }
-            ChatUtils.print(makeComponent("Downloading plugin successful!", 0x3bc200));
+            return makeComponent("Downloading plugin successful!", 0x3bc200);
         } catch (IOException e) {
-            ChatUtils.print(makeComponent("Downloading plugin failed! " + e, 0xff0000));
+            return makeComponent("Downloading plugin failed! " + e, 0xff0000);
         }
     }
 
