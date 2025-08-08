@@ -21,7 +21,7 @@ public class RusherMan extends Plugin {
 			Path path = mc.gameDirectory.toPath().resolve("rusherhack/cache/plugins-and-themes.json");
 			Files.createDirectories(path.getParent());
 
-			try (InputStream in = new URL("https://raw.githubusercontent.com/RusherDevelopment/rusherhack-plugins/refs/heads/main/data/plugins-and-themes.json").openStream()) {
+			try (InputStream in = new URL("https://raw.githubusercontent.com/RusherDevelopment/rusherhack-plugins/refs/heads/main/generated/json/plugins-and-themes.json").openStream()) {
 				Files.copy(in, path, StandardCopyOption.REPLACE_EXISTING);
 			}
 			this.getLogger().info("Synced plugin json file!");
@@ -31,6 +31,9 @@ public class RusherMan extends Plugin {
 
 		final RusherManCommand rusherManCommand = new RusherManCommand();
 		RusherHackAPI.getCommandManager().registerFeature(rusherManCommand);
+
+		final confirm confirm = new confirm();
+		RusherHackAPI.getCommandManager().registerFeature(confirm);
 	}
 	
 	@Override
