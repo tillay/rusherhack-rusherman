@@ -1,5 +1,5 @@
 {
-  "Plugin-Class": "org.tilley.RusherMan",
+  "Plugin-Class": "org.tilley.rusherman.RusherMan",
   "Name": "${project.plugin_name}",
   "Version": "${project.plugin_version}",
   "Description": "Simple package manager for rusherhack plugins",

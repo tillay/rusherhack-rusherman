@@ -1,10 +1,10 @@
-package org.tilley;
+package org.tilley.rusherman;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import org.rusherhack.client.api.feature.command.Command;
 import org.rusherhack.core.command.annotations.CommandExecutor;
-import static org.tilley.ComponentUtils.*;
+import static org.tilley.rusherman.ComponentUtils.*;
 
 import java.io.IOException;
 import java.io.InputStream;

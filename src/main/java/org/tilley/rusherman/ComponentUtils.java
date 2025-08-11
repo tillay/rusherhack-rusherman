@@ -1,4 +1,4 @@
-package org.tilley;
+package org.tilley.rusherman;
 
 import net.minecraft.network.chat.*;
 import net.minecraft.network.chat.Component;

@@ -1,4 +1,4 @@
-package org.tilley;
+package org.tilley.rusherman;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -20,9 +20,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 
-import static org.tilley.ComponentUtils.*;
+import static org.tilley.rusherman.ComponentUtils.*;
 
-import static org.tilley.PluginMetadata.parsePluginJarMetadata;
+import static org.tilley.rusherman.PluginMetadata.parsePluginJarMetadata;
 
 public class RusherManCommand extends Command {
 

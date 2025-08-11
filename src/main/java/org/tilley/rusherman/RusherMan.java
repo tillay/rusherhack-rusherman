@@ -1,4 +1,4 @@
-package org.tilley;
+package org.tilley.rusherman;
 
 import org.rusherhack.client.api.RusherHackAPI;
 import org.rusherhack.client.api.plugin.Plugin;
@@ -34,6 +34,10 @@ public class RusherMan extends Plugin {
 
 		final confirm confirm = new confirm();
 		RusherHackAPI.getCommandManager().registerFeature(confirm);
+
+		final RusherManWindow RusherManWindow = new RusherManWindow();
+		RusherHackAPI.getWindowManager().registerFeature(RusherManWindow);
+
 	}
 	
 	@Override
