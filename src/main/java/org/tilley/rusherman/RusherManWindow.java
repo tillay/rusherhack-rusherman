@@ -1,14 +1,16 @@
 package org.tilley.rusherman;
 
-import net.minecraft.network.chat.Component;
 import org.rusherhack.client.api.RusherHackAPI;
 import org.rusherhack.client.api.feature.window.PopupWindow;
 import org.rusherhack.client.api.feature.window.ResizeableWindow;
 import org.rusherhack.client.api.feature.window.Window;
+import org.rusherhack.client.api.ui.window.content.ComboContent;
 import org.rusherhack.client.api.ui.window.content.ListItemContent;
 import org.rusherhack.client.api.ui.window.content.WindowContent;
 import org.rusherhack.client.api.ui.window.content.component.ButtonComponent;
 import org.rusherhack.client.api.ui.window.content.component.ParagraphComponent;
+import org.rusherhack.client.api.ui.window.content.component.TextComponent;
+import org.rusherhack.client.api.ui.window.content.component.TextFieldComponent;
 import org.rusherhack.client.api.ui.window.context.ContextAction;
 import org.rusherhack.client.api.ui.window.view.*;
 
@@ -16,9 +18,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import org.rusherhack.client.api.utils.ChatUtils;
-import org.rusherhack.core.command.annotations.CommandExecutor;
-import org.rusherhack.core.command.argument.StringCapture;
+
 
 import java.io.*;
 import java.net.URL;
@@ -30,7 +30,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import static org.tilley.rusherman.ComponentUtils.makeComponent;
 import static org.tilley.rusherman.PluginMetadata.parsePluginJarMetadata;
 
 
@@ -42,33 +41,74 @@ public class RusherManWindow extends ResizeableWindow {
     private final PluginListView installedView;
     private final PluginListView availableView;
     private final List<PluginItem> installedItems = new ArrayList<>();
+    private final List<String> enabledPlugins = new ArrayList<>();
+    private final List<String> compatiblePlugins = new ArrayList<>();
     private final List<PluginItem> availableItems = new ArrayList<>();
 
     public RusherManWindow() {
-        super("RusherMan", 350, 325, 150, 100);
+        super("RusherMan", 350, 325, 400, 325);
         INSTANCE = this;
-
+        List<WindowContent> contents = new ArrayList<>();
         this.setMinWidth(400);
         this.setMinHeight(325);
 
-        this.installedView = new PluginListView("Installed", this, this.installedItems, true);
+        final TextComponent searchHelper = new TextComponent(this, "Search:");
+        final TextFieldComponent searchField = new TextFieldComponent(this, "", 100, false);
+        final ComboContent searchCombo = new ComboContent(this);
+        searchCombo.addContent(searchHelper);
+        searchCombo.addContent(searchField, ComboContent.AnchorSide.RIGHT);
+
         this.availableView = new PluginListView("Available", this, this.availableItems, false);
-        this.tabView = new TabbedView(this, List.of(this.installedView, this.availableView));
+        this.installedView = new PluginListView("Installed", this, this.installedItems, true);
 
-        for (String name : listInstalled()) {
-            this.installedItems.add(new PluginItem(name, true, this.installedView));
-        }
+        final SimpleView availableTab = new SimpleView("Available", this, List.of(searchCombo, this.availableView));
 
-        for (String name : listAllRemoteNames()) {
-            this.availableItems.add(new PluginItem(name, false, this.availableView));
-        }
+        this.tabView = new TabbedView(this, List.of(this.installedView, availableTab));
 
+        refreshLists("");
+
+        searchField.setReturnCallback(this::refreshLists);
     }
+
 
     @Override
     public WindowView getRootView() {
         return this.tabView;
     }
+
+    private void refreshLists(String substring) {
+        installedItems.clear();
+        availableItems.clear();
+        compatiblePlugins.clear();
+        enabledPlugins.clear();
+
+        String filter = substring == null ? "" : substring.toLowerCase().replace(" ", "").replace("-", "").replace("_", "");
+        for (String name : listInstalled(true)) {
+            this.installedItems.add(new PluginItem(name, true, this.installedView));
+            enabledPlugins.add(name);
+        }
+        for (String name : listInstalled(false)) {
+            this.installedItems.add(new PluginItem(name, true, this.installedView));
+        }
+        for (String name : listAllRemoteNames()) {
+            String check = name.toLowerCase().replace(" ", "").replace("-", "").replace("_", "");
+            if (filter.isEmpty() || check.contains(filter)) {
+                if (isCompatible(name)) {
+                    compatiblePlugins.add(name);
+                    this.availableItems.add(new PluginItem(name, false, this.availableView));
+                }
+            }
+        }
+        for (String name : listAllRemoteNames()) {
+            String check = name.toLowerCase().replace(" ", "").replace("-", "").replace("_", "");
+            if (filter.isEmpty() || check.contains(filter)) {
+                if (!isCompatible(name)) {
+                    this.availableItems.add(new PluginItem(name, false, this.availableView));
+                }
+            }
+        }
+    }
+
 
     class PluginItem extends ListItemContent {
         private final String name;
@@ -87,6 +127,17 @@ public class RusherManWindow extends ResizeableWindow {
         public String getAsString(ListView<?>.Column column) {
             if (column.getName().equalsIgnoreCase("Plugin Name")) {
                 return this.name;
+            } else if (column.getName().equalsIgnoreCase("Status")) {
+                if (enabledPlugins.contains(name) && this.isInstalled) {
+                    return "Enabled";
+                } else if (this.isInstalled) {
+                    return "Disabled";
+                }
+                if (compatiblePlugins.contains(name)) {
+                    return "Compatible";
+                } else {
+                    return "Not Compatible";
+                }
             }
             return "null";
         }
@@ -97,6 +148,8 @@ public class RusherManWindow extends ResizeableWindow {
         public PluginListView(String name, Window window, List<PluginItem> items, boolean installed) {
             super(name, window, items);
             this.addColumn("Plugin Name");
+            this.addColumn("Status", 0.4);
+
         }
     }
 
@@ -107,7 +160,7 @@ public class RusherManWindow extends ResizeableWindow {
             List<WindowContent>infoContent = new ArrayList<>();
             ScrollableView infoView = new ScrollableView("Infos", this, infoContent);
             ParagraphComponent infoComponent = new ParagraphComponent(this, getInfo(name, isInstalled));
-            infoComponent.setColor(0xff66ff);
+            infoComponent.setColor(0xfb9bff);
             infoContent.add(infoComponent);
             this.addContent(infoView);
             if (isInstalled) {
@@ -133,7 +186,7 @@ public class RusherManWindow extends ResizeableWindow {
                                     }
                                     this.onClose();
                                 }));
-                            } else {
+                            } else if (parsePluginJarMetadata(file).getMixinConfigs() == null) {
                                 infoContent.add(new ButtonComponent(this, "Disable", () -> {
                                     if (disablePlugin(name)) {
                                         RusherHackAPI.getWindowManager().popupWindow(new SuccessWindow());
@@ -146,10 +199,10 @@ public class RusherManWindow extends ResizeableWindow {
                     } catch (Exception ignored) {
                     }
                 }
-            } else {
+            } else if (isCompatible(name)) {
                 infoContent.add(new ButtonComponent(this, "Install", () -> {
                     try {
-                        RusherHackAPI.getWindowManager().popupWindow(new ConfirmationWindow("Are you sure you want to Install " + name + installPlugin(name), () -> ChatUtils.print("what")));
+                        RusherHackAPI.getWindowManager().popupWindow(new ConfirmationWindow("Are you sure you want to Install " + name + installPlugin(name), null));
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
@@ -232,13 +285,13 @@ public class RusherManWindow extends ResizeableWindow {
         return dir.listFiles(File::isFile);
     }
 
-    public List<String> listInstalled() {
+    public List<String> listInstalled(boolean enabled) {
         List<String> outputComponents = new ArrayList<>();
         for (File file : getFiles()) {
             try {
-                if (file.getName().endsWith(".jar")) {
+                if (file.getName().endsWith(".jar") && enabled) {
                     outputComponents.add(parsePluginJarMetadata(file).getName());
-                } else if (file.getName().endsWith(".jar.disabled")) {
+                } else if (file.getName().endsWith(".jar.disabled") && !enabled) {
                     outputComponents.add(parsePluginJarMetadata(file).getName());
                 }
             } catch (Exception e) {
@@ -267,18 +320,27 @@ public class RusherManWindow extends ResizeableWindow {
         }
     }
 
+    private boolean isCompatible(String pluginName) {
+        for (JsonElement plugin : getRemotePluginsJson()) {
+            JsonObject obj = plugin.getAsJsonObject();
+            if (!obj.get("name").getAsString().equalsIgnoreCase(pluginName)) continue;
+            return isVersionCompatible(obj.get("mc_versions").getAsString());
+        }
+        return false;
+    }
+
     private String getInfo(String name, boolean isInstalled) {
         if (!isInstalled) {
             for (JsonElement plugin : getRemotePluginsJson()) {
                 JsonObject obj = plugin.getAsJsonObject();
                 if (!obj.get("name").getAsString().equalsIgnoreCase(name)) continue;
-                return obj.get("name").getAsString() + ":\n\n"
-                        + "Author: " + obj.getAsJsonObject("creator").get("name").getAsString() + "\n"
-                        + "Description: " + obj.get("description").getAsString() + "\n"
-                        + "Plugin Repo: https://github.com/" + obj.get("repo").getAsString() + "\n"
-                        + "Supported versions: " + obj.get("mc_versions").getAsString() + "\n"
-                        + "Supports this version: " + isVersionCompatible(obj.get("mc_versions").getAsString()) + "\n"
-                        + "Is a core plugin: " + obj.get("is_core").getAsString() + "\n"
+                return obj.get("name").getAsString() + ":\n\n\n"
+                        + "Author: " + obj.getAsJsonObject("creator").get("name").getAsString() + "\n\n"
+                        + "Description: " + obj.get("description").getAsString() + "\n\n"
+                        + "Plugin Repo: https://github.com/" + obj.get("repo").getAsString() + "\n\n"
+                        + "Supported versions: " + obj.get("mc_versions").getAsString() + "\n\n"
+                        + "Supports this version: " + isVersionCompatible(obj.get("mc_versions").getAsString()) + "\n\n"
+                        + "Is a core plugin: " + obj.get("is_core").getAsString() + "\n\n"
                         + "This plugin is on the plugins repo.";
             }
         } else {
@@ -294,14 +356,14 @@ public class RusherManWindow extends ResizeableWindow {
 
                         String coreStatus = (parsePluginJarMetadata(file).getMixinConfigs() != null)
                                 ? " is a core plugin" : " is not a core plugin";
-                        return name + ":\n\n" +
-                                "Plugin Name: " + name + "\n" +
-                                "Description: " + parsePluginJarMetadata(file).getDescription() + "\n" +
-                                "url: " + parsePluginJarMetadata(file).getURL() + "\n" +
-                                "Authors: " + String.join(", ", parsePluginJarMetadata(file).getAuthors()) + "\n" +
-                                isDisabled + "\n" +
-                                name + coreStatus + "\n" +
-                                "Jarfile Name: " + file.getName() + "\n" +
+                        return name + "\n\n\n" +
+                                "Plugin Name: " + name + "\n\n" +
+                                "Description: " + parsePluginJarMetadata(file).getDescription() + "\n\n" +
+                                "url: " + parsePluginJarMetadata(file).getURL() + "\n\n" +
+                                "Authors: " + String.join(", ", parsePluginJarMetadata(file).getAuthors()) + "\n\n" +
+                                isDisabled + "\n\n" +
+                                name + coreStatus + "\n\n" +
+                                "Jarfile Name: " + file.getName() + "\n\n" +
                                 "This plugin is installed locally.";
                     }
                 } catch (Exception e) {
@@ -322,7 +384,6 @@ public class RusherManWindow extends ResizeableWindow {
         return supported.equals(range);
     }
 
-    // Chatgpt made this im sorry but this was hurting my brain
     private int compareVersion(String a, String b) {
         String[] sa = a.split("\\.");
         String[] sb = b.split("\\.");
@@ -398,7 +459,7 @@ public class RusherManWindow extends ResizeableWindow {
                     return outputString.append("\nclick Download to continue download").toString();
 
                 } else {
-                    outputString.append("Detected Multiple links\n");
+                    outputString.append("\n\nDetected Multiple links\n");
                     int i = 1;
                     for (String link : possibleLinks) {
                         guiLinks.add(link);
