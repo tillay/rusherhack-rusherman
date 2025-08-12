@@ -1,11 +1,13 @@
 package org.tilley.rusherman;
 
+import net.minecraft.SharedConstants;
 import org.rusherhack.client.api.RusherHackAPI;
 import org.rusherhack.client.api.feature.window.PopupWindow;
 import org.rusherhack.client.api.feature.window.ResizeableWindow;
 import org.rusherhack.client.api.feature.window.Window;
 import org.rusherhack.client.api.ui.window.content.ComboContent;
 import org.rusherhack.client.api.ui.window.content.ListItemContent;
+import org.rusherhack.client.api.ui.window.content.PaddingContent;
 import org.rusherhack.client.api.ui.window.content.WindowContent;
 import org.rusherhack.client.api.ui.window.content.component.ButtonComponent;
 import org.rusherhack.client.api.ui.window.content.component.ParagraphComponent;
@@ -37,7 +39,7 @@ public class RusherManWindow extends ResizeableWindow {
     public static List<String> guiLinks = new ArrayList<>();
 
     public static RusherManWindow INSTANCE;
-    private final TabbedView tabView;
+    private TabbedView tabView = null;
     private final PluginListView installedView;
     private final PluginListView availableView;
     private final List<PluginItem> installedItems = new ArrayList<>();
@@ -48,7 +50,6 @@ public class RusherManWindow extends ResizeableWindow {
     public RusherManWindow() {
         super("RusherMan", 350, 325, 400, 325);
         INSTANCE = this;
-        List<WindowContent> contents = new ArrayList<>();
         this.setMinWidth(400);
         this.setMinHeight(325);
 
@@ -60,10 +61,28 @@ public class RusherManWindow extends ResizeableWindow {
 
         this.availableView = new PluginListView("Available", this, this.availableItems, false);
         this.installedView = new PluginListView("Installed", this, this.installedItems, true);
-
         final SimpleView availableTab = new SimpleView("Available", this, List.of(searchCombo, this.availableView));
 
-        this.tabView = new TabbedView(this, List.of(this.installedView, availableTab));
+        final ComboContent bottomButtonCombo = new ComboContent(this);
+        ButtonComponent reloadButton = new ButtonComponent(this, "Reload", this::reloadPlugins);
+        ButtonComponent infoButton = new ButtonComponent(this, "Get Info", () -> {
+            if (installedView.getSelectedItem() != null && this.tabView.getActiveTabView() == this.installedView) {
+                InfoPopup infoPopup = new InfoPopup(installedView.getSelectedItem().isInstalled, installedView.getSelectedItem().name);
+                RusherHackAPI.getWindowManager().popupWindow(infoPopup);
+
+            } else if (availableView.getSelectedItem() != null && this.tabView.getActiveTabView() == availableTab) {
+                InfoPopup infoPopup = new InfoPopup(availableView.getSelectedItem().isInstalled, availableView.getSelectedItem().name);
+                RusherHackAPI.getWindowManager().popupWindow(infoPopup);
+            }
+        });
+
+        reloadButton.setWidth(80);
+        infoButton.setWidth(80);
+
+        bottomButtonCombo.addContent(reloadButton);
+        bottomButtonCombo.addContent(infoButton);
+
+        this.tabView = new TabbedView(this, List.of(this.installedView, availableTab, bottomButtonCombo));
 
         refreshLists("");
 
@@ -165,7 +184,7 @@ public class RusherManWindow extends ResizeableWindow {
             this.addContent(infoView);
             if (isInstalled) {
                 infoContent.add(new ButtonComponent(this, "Uninstall", () -> {
-                    RusherHackAPI.getWindowManager().popupWindow(new ConfirmationWindow("Are you sure you want to uninstall " + name, () -> {
+                    RusherHackAPI.getWindowManager().popupWindow(new ConfirmationWindow("Are you sure you want to uninstall " + name + "?", () -> {
                         try {
                             if (removePlugin(name)) {
                                 this.onClose();
@@ -200,13 +219,15 @@ public class RusherManWindow extends ResizeableWindow {
                     }
                 }
             } else if (isCompatible(name)) {
-                infoContent.add(new ButtonComponent(this, "Install", () -> {
+                ButtonComponent installButton = new ButtonComponent(this, "Install", () -> {
                     try {
                         RusherHackAPI.getWindowManager().popupWindow(new ConfirmationWindow("Are you sure you want to Install " + name + installPlugin(name), null));
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
-                }));
+                });
+                installButton.setWidth(60);
+                infoContent.add(installButton);
             }
         }
 
@@ -216,39 +237,68 @@ public class RusherManWindow extends ResizeableWindow {
     class ConfirmationWindow extends PopupWindow {
 
         public ConfirmationWindow(String text, Runnable command) {
-            super("Confirm", RusherManWindow.this, 600, 150);
+            super("Confirm", RusherManWindow.this, text.length() > 100 ? 600 : 300, 150);
             List<WindowContent> content = new ArrayList<>();
             ScrollableView view = new ScrollableView("Confirm", this, content);
             ParagraphComponent paragraph = new ParagraphComponent(this, text);
             paragraph.setColor(0x00ffff);
             content.add(paragraph);
-            if (guiLinks.size() == 0) {
-                content.add(new ButtonComponent(this, "Confirm", () -> {
+            if (guiLinks.isEmpty()) {
+                ButtonComponent confirmButton = (new ButtonComponent(this, "Confirm", () -> {
                     command.run();
                     RusherHackAPI.getWindowManager().popupWindow(new SuccessWindow());
                     this.onClose();
                 }));
+                confirmButton.setWidth(140);
+                ComboContent confirmCombo = new ComboContent(this);
+                PaddingContent confirmPadding = new PaddingContent(this, this.getWidth()/2 - 70 - 8, 30);
+
+                confirmCombo.addContent(confirmPadding);
+                confirmCombo.addContent(confirmButton);
+                confirmCombo.addContent(confirmPadding);
+
+                content.add(confirmCombo);
             } else {
                 if (guiLinks.size() == 1) {
-                    content.add(new ButtonComponent(this, "Download", () -> {
+                    ButtonComponent downloadButton = new ButtonComponent(this, "Download", () -> {
                         downloadPlugin(guiLinks.getFirst());
                         RusherHackAPI.getWindowManager().popupWindow(new SuccessWindow());
                         this.onClose();
-                    }));
+                    });
+                    downloadButton.setWidth(140);
+                    content.add(downloadButton);
+
                 } else {
                     int i = 1;
+                    ComboContent buttonCombo = new ComboContent(this);
                     for (String url : guiLinks) {
-                        content.add(new ButtonComponent(this, "Download from link " + i++, () -> {
+                        ButtonComponent downloadButton = new ButtonComponent(this, "Download from link " + i++, () -> {
                             downloadPlugin(url);
                             RusherHackAPI.getWindowManager().popupWindow(new SuccessWindow());
                             this.onClose();
-                        }));
+                        });
+                        downloadButton.setWidth(140);
+                        buttonCombo.addContent(downloadButton);
+                        if (buttonCombo.getContents().size() == 2) {
+                            content.add(buttonCombo);
+                            buttonCombo = new ComboContent(this);
+                        }
                     }
+                    if (!buttonCombo.getContents().isEmpty()) content.add(buttonCombo);
+
                 }
             }
+            ComboContent cancelCombo = new ComboContent(this);
+            ButtonComponent cancelButton = new ButtonComponent(this, "Cancel", this::onClose);
+            PaddingContent cancelPadding = new PaddingContent(this, this.getWidth()/2 - 70 - 8, 30);
+            cancelButton.setWidth(140);
 
-            content.add(new ButtonComponent(this, "Cancel", this::onClose));
+            cancelCombo.addContent(cancelPadding);
+            cancelCombo.addContent(cancelButton);
+            cancelCombo.addContent(cancelPadding);
+            cancelButton.setWidth(140);
 
+            content.add(cancelCombo);
             this.addContent(view);
         }
     }
@@ -257,19 +307,31 @@ public class RusherManWindow extends ResizeableWindow {
 
         public SuccessWindow() {
             super("Success!", RusherManWindow.this, 300, 150);
+            int buttonWidth = 40;
             List<WindowContent> content = new ArrayList<>();
-            ScrollableView view = new ScrollableView("SuccessInfo", this, content);
+            SimpleView view = new SimpleView("SuccessInfo", this, content);
             ParagraphComponent paragraph = new ParagraphComponent(this, "Success! For changes to take place, you need to reload plugins. You can do that by clicking the reload button, or typing *reload.");
             paragraph.setColor(0x00ff00);
             content.add(paragraph);
 
-            content.add(new ButtonComponent(this, "Reload", () -> {
+            final ComboContent buttonCombo = new ComboContent(this);
+
+            ButtonComponent reloadButton = new ButtonComponent(this, "Reload", () -> {
                 reloadPlugins();
                 this.onClose();
-            }));
+            });
+            reloadButton.setWidth(buttonWidth);
 
-            content.add(new ButtonComponent(this, "OK", this::onClose));
+            ButtonComponent okButton = new ButtonComponent(this, "Later", this::onClose);
+            okButton.setWidth(buttonWidth);
 
+            PaddingContent buttonPadding = new PaddingContent(this, this.getWidth()/2 - buttonWidth - 8, 30);
+            buttonCombo.addContent(buttonPadding);
+            buttonCombo.addContent(reloadButton);
+            buttonCombo.addContent(okButton);
+            buttonCombo.addContent(buttonPadding);
+
+            content.add(buttonCombo);
             this.addContent(view);
         }
     }
@@ -376,7 +438,7 @@ public class RusherManWindow extends ResizeableWindow {
 
 
     private boolean isVersionCompatible(String range) {
-        String supported = net.minecraft.SharedConstants.getCurrentVersion().getName();
+        String supported = SharedConstants.getCurrentVersion().getName();
         if (range.contains("-")) {
             String[] parts = range.split("-");
             return compareVersion(supported, parts[0]) >= 0 && compareVersion(supported, parts[1]) <= 0;
