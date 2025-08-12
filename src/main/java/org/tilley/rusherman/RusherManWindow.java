@@ -65,7 +65,7 @@ public class RusherManWindow extends ResizeableWindow {
 
         final ComboContent bottomButtonCombo = new ComboContent(this);
         ButtonComponent reloadButton = new ButtonComponent(this, "Reload", this::reloadPlugins);
-        ButtonComponent infoButton = new ButtonComponent(this, "Get Info", () -> {
+        ButtonComponent infoButton = new ButtonComponent(this, "Info", () -> {
             if (installedView.getSelectedItem() != null && this.tabView.getActiveTabView() == this.installedView) {
                 InfoPopup infoPopup = new InfoPopup(installedView.getSelectedItem().isInstalled, installedView.getSelectedItem().name);
                 RusherHackAPI.getWindowManager().popupWindow(infoPopup);
@@ -137,7 +137,7 @@ public class RusherManWindow extends ResizeableWindow {
             super(RusherManWindow.this, view);
             this.name = name;
             this.isInstalled = isInstalled;
-            this.contextMenu.add(new ContextAction("Get Info", () -> {
+            this.contextMenu.add(new ContextAction("More Info", () -> {
                 RusherHackAPI.getWindowManager().popupWindow(new InfoPopup(isInstalled, name));
             }));
         }
@@ -226,8 +226,14 @@ public class RusherManWindow extends ResizeableWindow {
                         throw new RuntimeException(e);
                     }
                 });
+                ComboContent installButtonCombo = new ComboContent(this);
+                PaddingContent installPadding = new PaddingContent(this, this.width /2 - 30 -8, 30);
+                installButtonCombo.addContent(installPadding);
+                installButtonCombo.addContent(installButton);
                 installButton.setWidth(60);
-                infoContent.add(installButton);
+
+                installButtonCombo.addContent(installPadding);
+                infoContent.add(installButtonCombo);
             }
         }
 
@@ -265,12 +271,22 @@ public class RusherManWindow extends ResizeableWindow {
                         RusherHackAPI.getWindowManager().popupWindow(new SuccessWindow());
                         this.onClose();
                     });
+
+                    ComboContent downloadCombo = new ComboContent(this);
+                    PaddingContent downloadPadding = new PaddingContent(this, this.getWidth()/2 - 70 - 8, 30);
                     downloadButton.setWidth(140);
-                    content.add(downloadButton);
+
+                    downloadCombo.addContent(downloadPadding);
+                    downloadCombo.addContent(downloadButton);
+                    downloadCombo.addContent(downloadPadding);
+
+                    content.add(downloadCombo);
 
                 } else {
                     int i = 1;
                     ComboContent buttonCombo = new ComboContent(this);
+                    PaddingContent mutiplePadding = new PaddingContent(this, (this.getWidth() - 140 * guiLinks.size())/2 - 8, 30);
+                    buttonCombo.addContent(mutiplePadding);
                     for (String url : guiLinks) {
                         ButtonComponent downloadButton = new ButtonComponent(this, "Download from link " + i++, () -> {
                             downloadPlugin(url);
@@ -279,13 +295,10 @@ public class RusherManWindow extends ResizeableWindow {
                         });
                         downloadButton.setWidth(140);
                         buttonCombo.addContent(downloadButton);
-                        if (buttonCombo.getContents().size() == 2) {
-                            content.add(buttonCombo);
-                            buttonCombo = new ComboContent(this);
-                        }
-                    }
-                    if (!buttonCombo.getContents().isEmpty()) content.add(buttonCombo);
 
+                    }
+                    buttonCombo.addContent(mutiplePadding);
+                    content.add(buttonCombo);
                 }
             }
             ComboContent cancelCombo = new ComboContent(this);
@@ -392,17 +405,18 @@ public class RusherManWindow extends ResizeableWindow {
     }
 
     private String getInfo(String name, boolean isInstalled) {
+        String newline = "\n";
         if (!isInstalled) {
             for (JsonElement plugin : getRemotePluginsJson()) {
                 JsonObject obj = plugin.getAsJsonObject();
                 if (!obj.get("name").getAsString().equalsIgnoreCase(name)) continue;
-                return obj.get("name").getAsString() + ":\n\n\n"
-                        + "Author: " + obj.getAsJsonObject("creator").get("name").getAsString() + "\n\n"
-                        + "Description: " + obj.get("description").getAsString() + "\n\n"
-                        + "Plugin Repo: https://github.com/" + obj.get("repo").getAsString() + "\n\n"
-                        + "Supported versions: " + obj.get("mc_versions").getAsString() + "\n\n"
-                        + "Supports this version: " + isVersionCompatible(obj.get("mc_versions").getAsString()) + "\n\n"
-                        + "Is a core plugin: " + obj.get("is_core").getAsString() + "\n\n"
+                return obj.get("name").getAsString() + ":\n" + newline
+                        + "Author: " + obj.getAsJsonObject("creator").get("name").getAsString() + newline
+                        + "Description: " + obj.get("description").getAsString() + newline
+                        + "Plugin Repo: https://github.com/" + obj.get("repo").getAsString() + newline
+                        + "Supported versions: " + obj.get("mc_versions").getAsString() + newline
+                        + "Supports this version: " + isVersionCompatible(obj.get("mc_versions").getAsString()) + newline
+                        + "Is a core plugin: " + obj.get("is_core").getAsString() + newline
                         + "This plugin is on the plugins repo.";
             }
         } else {
@@ -419,13 +433,13 @@ public class RusherManWindow extends ResizeableWindow {
                         String coreStatus = (parsePluginJarMetadata(file).getMixinConfigs() != null)
                                 ? " is a core plugin" : " is not a core plugin";
                         return name + "\n\n\n" +
-                                "Plugin Name: " + name + "\n\n" +
-                                "Description: " + parsePluginJarMetadata(file).getDescription() + "\n\n" +
-                                "url: " + parsePluginJarMetadata(file).getURL() + "\n\n" +
-                                "Authors: " + String.join(", ", parsePluginJarMetadata(file).getAuthors()) + "\n\n" +
-                                isDisabled + "\n\n" +
-                                name + coreStatus + "\n\n" +
-                                "Jarfile Name: " + file.getName() + "\n\n" +
+                                "Plugin Name: " + name + newline +
+                                "Description: " + parsePluginJarMetadata(file).getDescription() + newline +
+                                "url: " + parsePluginJarMetadata(file).getURL() + newline +
+                                "Authors: " + String.join(", ", parsePluginJarMetadata(file).getAuthors()) + newline +
+                                isDisabled + newline +
+                                name + coreStatus + newline +
+                                "Jarfile Name: " + file.getName() + newline +
                                 "This plugin is installed locally.";
                     }
                 } catch (Exception e) {
