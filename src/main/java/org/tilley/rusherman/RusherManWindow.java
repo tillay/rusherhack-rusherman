@@ -2,6 +2,7 @@ package org.tilley.rusherman;
 
 import net.minecraft.SharedConstants;
 import org.rusherhack.client.api.RusherHackAPI;
+import org.rusherhack.client.api.feature.module.ToggleableModule;
 import org.rusherhack.client.api.feature.window.PopupWindow;
 import org.rusherhack.client.api.feature.window.ResizeableWindow;
 import org.rusherhack.client.api.feature.window.Window;
@@ -501,7 +502,9 @@ public class RusherManWindow extends ResizeableWindow {
         // good coding practices frfr thanks john
         mc.schedule(() -> {
             mc.schedule(() -> {
-                mc.setScreen(RusherHackAPI.getThemeManager().getWindowsScreen());
+                ToggleableModule windowsModule = (ToggleableModule) RusherHackAPI.getModuleManager().getFeature("Windows").get();
+                windowsModule.toggle();
+
             });
         });
 
